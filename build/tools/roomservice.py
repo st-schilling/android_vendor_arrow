@@ -24,6 +24,8 @@ import sys
 
 from xml.etree import ElementTree
 
+from pathlib import Path
+
 try:
     # For python3
     import urllib.error
@@ -45,8 +47,8 @@ default_manifest = ".repo/manifest.xml"
 custom_local_manifest = ".repo/local_manifests/roomservice.xml"
 custom_default_revision = "arrow-11.0"
 custom_dependencies = "arrow.dependencies"
-org_manifest = "ArrowOS-Devices"  # leave empty if org is provided in manifest
-org_display = "ArrowOS-Devices"  # needed for displaying
+org_manifest = "st-schilling"  # leave empty if org is provided in manifest
+org_display = "st-schilling"  # needed for displaying
 
 arrow_manifest = ".repo/manifests/arrow.xml"
 hals_manifest = ".repo/manifests/hals.xml"
@@ -188,6 +190,10 @@ def add_to_manifest(repos, fallback_branch=None):
         else:
             repo_remote = org_manifest
 
+        if Path(repo_target).exists():
+            print('already exists: %s' % repo_target)
+            continue
+
         if is_in_manifest(repo_target):
             print('already exists: %s' % repo_target)
             continue
@@ -251,7 +257,7 @@ def fetch_dependencies(repo_path, fallback_branch=None):
         return
     _fetch_dep_cache.append(repo_path)
 
-    print('Looking for dependencies')
+    print('Looking for dependencies in %s' % repo_path)
 
     dep_p = '/'.join((repo_path, custom_dependencies))
     if os.path.exists(dep_p):
@@ -265,6 +271,10 @@ def fetch_dependencies(repo_path, fallback_branch=None):
     syncable_repos = []
 
     for dependency in dependencies:
+        if Path(dependency['target_path']).exists():
+            print('Dependency already exists: %s' % dependency['target_path'])
+            continue
+
         if not is_in_manifest(dependency['target_path']):
             if not dependency.get('branch'):
                 dependency['branch'] = (get_revision() or
@@ -274,11 +284,11 @@ def fetch_dependencies(repo_path, fallback_branch=None):
             syncable_repos.append(dependency['target_path'])
 
     if fetch_list:
-        print('Adding dependencies to manifest')
+        print('Adding dependencies to manifest %s' % fetch_list)
         add_to_manifest(fetch_list, fallback_branch)
 
     if syncable_repos:
-        print('Syncing dependencies')
+        print('Syncing dependencies %s' % syncable_repos)
         os.system('repo sync --force-sync --no-tags --current-branch --no-clone-bundle %s' %
                   ' '.join(syncable_repos))
 
@@ -384,9 +394,13 @@ def main():
 
         add_to_manifest(adding, fallback_branch)
 
-        print("Syncing repository to retrieve project.")
-        os.system(
-            'repo sync --force-sync --no-clone-bundle --current-branch --no-tags %s' % repo_path)
+        print("Syncing repository %s to retrieve project." % repository['url'])
+        if Path(repo_path).exists():
+            print('No syncing of repository %s it exists already' % repository['url'])
+        else:
+            os.system(
+                'repo sync --force-sync --no-clone-bundle --current-branch --no-tags %s' % repo_path)
+
         print("Repository synced!")
 
         fetch_dependencies(repo_path, fallback_branch)
